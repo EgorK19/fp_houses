@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+
+# Virtual environments
+.venv/
+
+# Environment secrets
+.env
+
+# Testing / coverage / linters
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ! Data - кроме шаблона
+# /data/
+
+# ! Models and weights - кроме шаблона
+# /models/
+
+# Logs
+
+# Databases
+
+# ! IDE - кроме шаблона
+
+# .idea/
+# .vscode/
+# *.code-workspace
+
+# Extra

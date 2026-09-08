@@ -1,0 +1,23 @@
+{
+    // --- Editor / Formatter — обязательно для проекта ---
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+
+    // --- Python ---
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+
+    // --- Notebook / Jupyter ---
+    "notebook.formatOnSave.enabled": true,
+    "notebook.defaultFormatter": "charliermarsh.ruff",
+
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+    // --- Type Checking ---
+    "python.analysis.typeCheckingMode": "basic"
+}

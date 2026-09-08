@@ -1,0 +1,25 @@
+{
+  "recommendations": [
+    "charliermarsh.ruff",
+    "ms-python.python",
+    "ms-python.vscode-python-envs",
+    "ms-toolsai.jupyter",
+    "ms-azuretools.vscode-containers",
+    "pkief.material-icon-theme",
+    "anthropic.claude-code",
+
+    "aaron-bond.better-comments",
+    "bierner.emojisense",
+    "kevinrose.vsc-python-indent",
+    "njpwerner.autodocstring",
+    "usernamehw.errorlens",
+
+    "redhat.vscode-yaml",
+    "wholroyd.jinja",
+    "mechatroner.rainbow-csv",
+    "qwtel.sqlite-viewer",
+    "github.vscode-pull-request-github",
+    "google.colab",
+    "ms-vscode-remote.remote-containers"
+  ]
+}
