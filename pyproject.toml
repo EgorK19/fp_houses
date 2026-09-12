@@ -9,12 +9,15 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "ipykernel>=7.3.0",
+    "lightgbm>=4.7.0",
     "matplotlib>=3.11.1",
     "numpy>=2.5.3",
     "omegaconf>=2.3.1",
     "pandas>=3.0.5",
     "pyprojroot>=0.3.0",
     "python-dotenv>=1.2.3",
+    "scikit-learn>=1.9.0",
     "seaborn>=0.13.2",
+    "tqdm>=4.70.1",
 ]
 package = false

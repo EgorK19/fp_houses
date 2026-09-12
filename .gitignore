@@ -18,7 +18,7 @@ __pycache__/
 *.csv
 
 # ! Models and weights - кроме шаблона
-# /models/
+/models/
 
 # Logs
 
