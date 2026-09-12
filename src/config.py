@@ -38,6 +38,12 @@ config_dict = {
             "params": {"alpha": 1},
         },
         {
+            "name": "svc",
+            "pipeline": "linear",
+            "estimator": "SVC",
+            "params": {},
+        },
+        {
             "name": "knn_regressor",
             "pipeline": "linear",
             "estimator": "KNeighborsRegressor",
