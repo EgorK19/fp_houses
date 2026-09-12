@@ -38,9 +38,9 @@ config_dict = {
             "params": {"alpha": 1},
         },
         {
-            "name": "svc",
+            "name": "svr",
             "pipeline": "linear",
-            "estimator": "SVC",
+            "estimator": "SVR",
             "params": {},
         },
         {
