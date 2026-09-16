@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from src.config import cfg
+from src.processing import fix_data_bugs, remove_train_outliers
 
 
 def set_seed(seed: int = 42) -> None:
@@ -32,15 +33,39 @@ def set_seed(seed: int = 42) -> None:
         pass
 
 
-def load_data(cfg):
-    df_train = pd.read_csv(Path(cfg.paths.train))
-    df_test = pd.read_csv(Path(cfg.paths.test))
+def load_data(cfg, use_raw=True):
+    if use_raw:
+        df_train = pd.read_csv(Path(cfg.paths.train))
+        df_test = pd.read_csv(Path(cfg.paths.test))
 
-    X_train = df_train.drop(columns=["Id", "SalePrice"])
-    y_train_raw = df_train["SalePrice"]
+        X_train = df_train.drop(columns=["Id", "SalePrice"])
+        y_train_raw = df_train["SalePrice"]
 
-    test_ids = df_test["Id"]
-    X_test = df_test.drop(columns=["Id"])
+        test_ids = df_test["Id"]
+        X_test = df_test.drop(columns=["Id"])
+
+    else:
+        df_train = pd.read_csv(Path(cfg.paths.train))
+        df_test = pd.read_csv(Path(cfg.paths.test))
+
+        df_all_data = pd.concat([df_train, df_test], axis=0).reset_index(drop=True)
+        df_all_data = df_all_data.drop(columns=["SalePrice"])
+        df_all_data = fix_data_bugs(df_all_data)
+
+        X_train_raw, X_test = (
+            df_all_data[: df_train.shape[0]],
+            df_all_data[df_train.shape[0] :],
+        )
+
+        df_raw = remove_train_outliers(
+            pd.concat([X_train_raw, df_train["SalePrice"]], axis=1)
+        )
+
+        X_train = df_raw.drop(columns=["Id", "SalePrice"])
+        y_train_raw = df_raw["SalePrice"]
+
+        test_ids = X_test["Id"]
+        X_test = X_test.drop(columns=["Id"])
 
     return X_train, y_train_raw, X_test, test_ids
 

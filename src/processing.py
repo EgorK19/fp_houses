@@ -10,6 +10,10 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 warnings.filterwarnings(
     "ignore", category=UserWarning, message=".*Found unknown categories.*"
 )
+import warnings
+
+warnings.filterwarnings("ignore", message="Found unknown categories in columns")
+warnings.filterwarnings("ignore", message=".*unseen categories converted to Unseen.*")
 
 
 class BaselineTransformer(BaseEstimator, TransformerMixin):
@@ -127,25 +131,28 @@ class MemoryOptimizer(BaseEstimator, TransformerMixin):
         self.category_levels_ = {}
 
         for col in X.columns:
-            col_type = X[col].dtype
+            dtype = X[col].dtype
 
-            if self.optimize_categories and (
-                col_type == "object"
-                or col_type.name == "string"
-                or col_type.name == "category"
-            ):
+            is_categorical_like = (
+                dtype == object
+                or isinstance(dtype, pd.CategoricalDtype)
+                or pd.api.types.is_string_dtype(
+                    dtype
+                )  # покрывает object, "string", "str" и любые будущие строковые backend'ы
+            )
+
+            if self.optimize_categories and is_categorical_like:
                 nunique = X[col].nunique()
                 if self.cat_threshold is None or nunique <= self.cat_threshold:
                     self.categorical_cols_.append(col)
-                    # запоминаем уровни, известные на fit, чтобы ловить unseen-категории на transform
                     self.category_levels_[col] = set(X[col].dropna().unique())
                 continue
 
-            if "int" in str(col_type):
+            if "int" in str(dtype):
                 downcasted = pd.to_numeric(X[col], downcast="integer")
                 self.numeric_downcast_rules_[col] = downcasted.dtype
 
-            elif "float" in str(col_type):
+            elif "float" in str(dtype):
                 downcasted = pd.to_numeric(X[col], downcast="float")
                 if self.float16_as32 and downcasted.dtype == np.float16:
                     self.numeric_downcast_rules_[col] = np.dtype(np.float32)
@@ -175,14 +182,10 @@ class MemoryOptimizer(BaseEstimator, TransformerMixin):
                 n_unseen = unseen_mask.sum()
 
                 if n_unseen > 0:
-                    X_out.loc[unseen_mask, col] = np.nan
+                    X_out.loc[unseen_mask, col] = "Unseen"
                     warnings.warn(
-                        f"Column '{col}': {n_unseen} unseen categories converted to NaN on transform."
+                        f"Column '{col}': {n_unseen} unseen categories converted to Unseen on transform."
                     )
-
-                new_na = X_out[col].isna().sum()
-                if new_na > original_na and n_unseen == 0:
-                    pass
 
         for col, target_dtype in self.numeric_downcast_rules_.items():
             if col not in X_out.columns:
@@ -227,16 +230,21 @@ class MemoryOptimizer(BaseEstimator, TransformerMixin):
 
 
 class ToCategory(OneToOneFeatureMixin, BaseEstimator, TransformerMixin):
-    def __init__(self, columns):
+    def __init__(self, columns, unseen_placeholder="Unseen"):
         self.columns = columns
+        self.unseen_placeholder = unseen_placeholder
 
     def fit(self, X, y=None):
         self.n_features_in_ = X.shape[1]
         self.feature_names_in_ = np.asarray(X.columns)
-        self.categories_ = {
-            col: pd.Index(X[col].astype("category").cat.categories)
-            for col in self.columns
-        }
+        self.categories_ = {}
+
+        for col in self.columns:
+            cats = pd.Index(X[col].astype("category").cat.categories)
+            if self.unseen_placeholder not in cats:
+                cats = cats.insert(len(cats), self.unseen_placeholder)
+            self.categories_[col] = cats
+
         return self
 
     def transform(self, X):
@@ -244,6 +252,51 @@ class ToCategory(OneToOneFeatureMixin, BaseEstimator, TransformerMixin):
         for col in self.columns:
             X_copy[col] = pd.Categorical(X_copy[col], categories=self.categories_[col])
         return X_copy
+
+
+def fix_data_bugs(df):
+    df = df.copy()
+
+    idx_2126 = 2126
+    detchd_mask = df["GarageType"] == "Detchd"
+
+    for col in ["GarageQual", "GarageCond"]:
+        df.loc[idx_2126, col] = df.loc[detchd_mask, col].mode()[0]
+
+    df.loc[idx_2126, "GarageFinish"] = df.loc[detchd_mask, "GarageFinish"].mode()[0]
+    df.loc[idx_2126, "GarageYrBlt"] = df.loc[idx_2126, "YearBuilt"]
+
+    idx_2576 = 2576
+    df.loc[idx_2576, "GarageType"] = "None"
+    for col in ["GarageQual", "GarageFinish", "GarageCond"]:
+        df.loc[idx_2576, col] = "None"
+    df.loc[idx_2576, ["GarageYrBlt", "GarageCars", "GarageArea"]] = 0
+
+    idx_exposure_missing = [948, 1487, 2348]
+    idx_cond_missing = [2040, 2185, 2524]
+    idx_qual_missing = [2217, 2218]
+    idx_fintype2_missing = [332]
+
+    exposure_mode = df.loc[df["TotalBsmtSF"] > 0, "BsmtExposure"].mode()[0]
+    df.loc[idx_exposure_missing, "BsmtExposure"] = exposure_mode
+
+    cond_mode = df.loc[df["TotalBsmtSF"] > 0, "BsmtCond"].mode()[0]
+    df.loc[idx_cond_missing, "BsmtCond"] = cond_mode
+
+    qual_mode = df.loc[df["TotalBsmtSF"] > 0, "BsmtQual"].mode()[0]
+    df.loc[idx_qual_missing, "BsmtQual"] = qual_mode
+
+    fintype2_mode = df.loc[df["BsmtFinSF2"] > 0, "BsmtFinType2"].mode()[0]
+    df.loc[idx_fintype2_missing, "BsmtFinType2"] = fintype2_mode
+
+    df.loc[2592, "GarageYrBlt"] = 2007
+
+    return df
+
+
+def remove_train_outliers(df_train):
+    outlier_mask = (df_train["GrLivArea"] > 4000) & (df_train["SalePrice"] < 300000)
+    return df_train[~outlier_mask].reset_index(drop=True)
 
 
 from sklearn.pipeline import Pipeline
