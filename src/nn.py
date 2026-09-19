@@ -82,8 +82,10 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
             nn.Linear(n_features, self.hidden_size),
             nn.BatchNorm1d(self.hidden_size),
             nn.ReLU(),
-            # nn.Dropout(0.1),
-            nn.Linear(self.hidden_size, 1),
+            nn.Linear(self.hidden_size, self.hidden_size // 4),
+            nn.BatchNorm1d(self.hidden_size // 4),
+            nn.ReLU(),
+            nn.Linear(self.hidden_size // 4, 1),
         )
 
     def fit(self, X, y):
