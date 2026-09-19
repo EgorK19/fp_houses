@@ -80,8 +80,9 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
     def _build_model(self, n_features):
         return nn.Sequential(
             nn.Linear(n_features, self.hidden_size),
+            nn.BatchNorm1d(self.hidden_size),
             nn.ReLU(),
-            nn.Dropout(0.1),
+            # nn.Dropout(0.1),
             nn.Linear(self.hidden_size, 1),
         )
 
