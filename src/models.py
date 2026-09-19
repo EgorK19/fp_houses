@@ -1,6 +1,7 @@
+from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.linear_model import ElasticNet, LinearRegression, Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 
@@ -11,6 +12,8 @@ REGISTRY = {
     "RandomForestRegressor": RandomForestRegressor,
     "LGBMRegressor": LGBMRegressor,
     "SVR": SVR,
+    "CatBoostRegressor": CatBoostRegressor,
+    "ElasticNet": ElasticNet,
 }
 
 

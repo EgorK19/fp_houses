@@ -3,11 +3,15 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 raw_data_dir = Path("d:/vs_projects/fp_houses/data/raw")
+database_path = Path(
+    "d:/vs_projects/fp_houses/notebooks/optuna_results/optuna_studies.db"
+)
+optuna_storage_uri = f"sqlite:///{database_path.as_posix()}"
+gseed = 101
+
 
 config_dict = {
-    "general": {
-        "seed": 101,
-    },
+    "general": {"seed": gseed, "use_raw": False},
     "paths": {
         "raw_dir": str(raw_data_dir),
         "pictures": str(Path("d:/vs_projects/fp_houses/data/pictures")),
@@ -21,62 +25,14 @@ config_dict = {
     "mode": "train_and_predict",  # "train_and_predict" | "train_only" | "predict_only"
     "inference": {
         # путь к конкретному артефакту для predict_only режима
-        # если None — main.py попробует взять "последний лучший" через pointer-файл
+        # если None - main.py попробует взять "последний лучший" через pointer-файл
         "artifact_path": None,
     },
-    "models": [
-        {
-            "name": "linear_regression",
-            "pipeline": "linear",
-            "estimator": "LinearRegression",
-            "params": {},
-        },
-        {
-            "name": "ridge_regression",
-            "pipeline": "linear",
-            "estimator": "Ridge",
-            "params": {"alpha": 1},
-        },
-        {
-            "name": "svr",
-            "pipeline": "linear",
-            "estimator": "SVR",
-            "params": {},
-        },
-        {
-            "name": "knn_regressor",
-            "pipeline": "linear",
-            "estimator": "KNeighborsRegressor",
-            "params": {},
-        },
-        {
-            "name": "rfr_regressor",
-            "pipeline": "tree_oe&ohe",
-            "estimator": "RandomForestRegressor",
-            "params": {},
-        },
-        {
-            "name": "lgbm_oe&ohe",
-            "pipeline": "tree_oe&ohe",
-            "estimator": "LGBMRegressor",
-            "params": {"verbosity": -1},
-        },
-        {
-            "name": "lgbm_oe&lgbm",
-            "pipeline": "tree_oe&lgbm",
-            "estimator": "LGBMRegressor",
-            "params": {"verbosity": -1},
-        },
-        {
-            "name": "lgbm_encoder",
-            "pipeline": "tree_lgbm_only",
-            "estimator": "LGBMRegressor",
-            "params": {"verbosity": -1},
-        },
-    ],
+    "models": [],
     "final": {
         "selection_metric": "OOF_rmsle",  # по какой метрике выбирать лучшую модель
-        "strategy": "cv_ensemble",  # "cv_ensemble" | "full_refit"
+        "default_strategy": "full_refit",  # "cv_ensemble" | "full_refit"
+        "submission_files": "all",  # "all" | "best"
     },
 }
 

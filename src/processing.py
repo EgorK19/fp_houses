@@ -409,6 +409,221 @@ ohe_columns = [
     "SaleType",
     "SaleCondition",
 ]
+from catboost import CatBoostRegressor
+
+
+def build_cat_features_fit_params(model, pipeline, prefix: str = "") -> dict:
+    if not isinstance(model, CatBoostRegressor):
+        return {}
+
+    to_cat_step = pipeline.named_steps.get("to_category")
+    if to_cat_step is None:
+        return {}
+
+    key = f"{prefix}cat_features" if prefix else "cat_features"
+    return {key: list(to_cat_step.columns)}
+
+
+class FinalTreeTransformer(BaseEstimator, TransformerMixin):
+    # Пропуск = "признака нет"
+    NONE_COLS: ClassVar[list[str]] = [
+        "MiscFeature",
+        "Fence",
+        "FireplaceQu",
+        "MasVnrType",
+        "GarageFinish",
+        "GarageType",
+        "BsmtQual",
+        "BsmtCond",
+        "BsmtExposure",
+        "BsmtFinType1",
+    ]
+
+    # Пропуск = 0
+    ZERO_COLS: ClassVar[list[str]] = [
+        "MasVnrArea",
+        "GarageYrBlt",
+        "GarageArea",
+        "GarageCars",
+        "BsmtFinSF1",
+        "BsmtFinSF2",
+        "BsmtUnfSF",
+        "TotalBsmtSF",
+        "BsmtFullBath",
+    ]
+
+    # Пропуск = самая частая категория
+    MODE_COLS: ClassVar[list[str]] = [
+        "MSZoning",
+        "Exterior1st",
+        "SaleType",
+        "KitchenQual",
+    ]
+
+    # Отброшенные признаки (нулевая важность)
+    DROP_COLS: ClassVar[list[str]] = [
+        "Id",
+        "EnclosedPorch",
+        "Exterior2nd",
+        "GarageCond",
+        "BedroomAbvGr",
+        "Electrical",
+        "Foundation",
+        "BsmtFinType2",
+        "LandSlope",
+        "RoofStyle",
+        "Alley",
+        "BsmtHalfBath",
+        "GarageQual",
+        "HouseStyle",
+        "LowQualFinSF",
+        "MiscVal",
+        "LandContour",
+        "Street",
+        "Utilities",
+        "Condition2",
+        "PoolQC",
+        "PoolArea",
+        "RoofMatl",
+    ]
+
+    def fit(self, X_original, y=None):
+        X = X_original.copy()
+
+        self.lotfrontage_medians2_ = X.groupby(by=["Neighborhood", "LotConfig"])[
+            "LotFrontage"
+        ].median()
+
+        self.lotfrontage_medians1_ = X.groupby(by=["Neighborhood"])[
+            "LotFrontage"
+        ].median()
+
+        self.lotfrontage_global_median_ = X["LotFrontage"].median()
+
+        self.modes_ = {col: X[col].mode()[0] for col in self.MODE_COLS}
+
+        return self
+
+    def transform(self, X_original):
+        X = X_original.copy()
+
+        if "MSSubClass" in X.columns:
+            X["MSSubClass"] = X["MSSubClass"].astype(str)
+
+        for col in self.NONE_COLS:
+            X[col] = X[col].fillna("None")
+
+        for col in self.ZERO_COLS:
+            X[col] = X[col].fillna(0)
+
+        keys2 = list(zip(X["Neighborhood"], X["LotConfig"]))
+        filled_2 = pd.Series(keys2, index=X.index).map(self.lotfrontage_medians2_)
+        X["LotFrontage"] = X["LotFrontage"].fillna(filled_2)
+
+        filled_1 = X["Neighborhood"].map(self.lotfrontage_medians1_)
+        X["LotFrontage"] = X["LotFrontage"].fillna(filled_1)
+
+        X["LotFrontage"] = X["LotFrontage"].fillna(self.lotfrontage_global_median_)
+
+        for col, mode_value in self.modes_.items():
+            X[col] = X[col].fillna(mode_value)
+
+        X["Functional"] = X["Functional"].fillna("Typ")
+
+        # новые признаки: циклическое кодирование месяца продажи
+        X["MoSold_sin"] = np.sin(2 * np.pi * X["MoSold"] / 12)
+        X["MoSold_cos"] = np.cos(2 * np.pi * X["MoSold"] / 12)
+
+        X = X.drop(columns=self.DROP_COLS, errors="ignore")
+
+        return X
+
+
+new_num_columns = [
+    "LotFrontage",
+    "LotArea",
+    "OverallQual",
+    "OverallCond",
+    "YearBuilt",
+    "YearRemodAdd",
+    "MasVnrArea",
+    "BsmtFinSF1",
+    "BsmtFinSF2",
+    "BsmtUnfSF",
+    "TotalBsmtSF",
+    "1stFlrSF",
+    "2ndFlrSF",
+    "GrLivArea",
+    "BsmtFullBath",
+    "FullBath",
+    "HalfBath",
+    "KitchenAbvGr",
+    "TotRmsAbvGrd",
+    "Fireplaces",
+    "GarageYrBlt",
+    "GarageCars",
+    "GarageArea",
+    "WoodDeckSF",
+    "OpenPorchSF",
+    "3SsnPorch",
+    "ScreenPorch",
+    "MoSold",
+    "YrSold",
+    # новые признаки
+    "MoSold_sin",
+    "MoSold_cos",
+]
+
+new_ordinal_columns = [
+    "LotShape",  # Reg > IR1 > IR2 > IR3
+    "ExterQual",  # Ex > Gd > TA > Fa > Po
+    "ExterCond",  # Ex > Gd > TA > Fa > Po
+    "BsmtQual",  # Ex > Gd > TA > Fa > Po > None
+    "BsmtCond",  # Ex > Gd > TA > Fa > Po > None
+    "BsmtExposure",  # Gd > Av > Mn > No > None
+    "BsmtFinType1",  # GLQ > ALQ > BLQ > Rec > LwQ > Unf > None
+    "HeatingQC",  # Ex > Gd > TA > Fa > Po
+    "KitchenQual",  # Ex > Gd > TA > Fa > Po
+    "Functional",  # Typ > Min1 > Min2 > Mod > Maj1 > Maj2 > Sev > Sal
+    "FireplaceQu",  # Ex > Gd > TA > Fa > Po > None
+    "GarageFinish",  # Fin > RFn > Unf > None
+    "PavedDrive",  # Y > P > N
+    "CentralAir",  # Y > N
+]
+
+new_ordinal_categories = [
+    ["IR3", "IR2", "IR1", "Reg"],  # LotShape
+    ["Po", "Fa", "TA", "Gd", "Ex"],  # ExterQual
+    ["Po", "Fa", "TA", "Gd", "Ex"],  # ExterCond
+    ["None", "Po", "Fa", "TA", "Gd", "Ex"],  # BsmtQual
+    ["None", "Po", "Fa", "TA", "Gd", "Ex"],  # BsmtCond
+    ["None", "No", "Mn", "Av", "Gd"],  # BsmtExposure
+    ["None", "Unf", "LwQ", "Rec", "BLQ", "ALQ", "GLQ"],  # BsmtFinType1
+    ["Po", "Fa", "TA", "Gd", "Ex"],  # HeatingQC
+    ["Po", "Fa", "TA", "Gd", "Ex"],  # KitchenQual
+    ["Sal", "Sev", "Maj2", "Maj1", "Mod", "Min2", "Min1", "Typ"],  # Functional
+    ["None", "Po", "Fa", "TA", "Gd", "Ex"],  # FireplaceQu
+    ["None", "Unf", "RFn", "Fin"],  # GarageFinish
+    ["N", "P", "Y"],  # PavedDrive
+    ["N", "Y"],  # CentralAir
+]
+
+new_ohe_columns = [
+    "Fence",
+    "MSSubClass",
+    "MSZoning",
+    "LotConfig",
+    "Neighborhood",
+    "Condition1",
+    "BldgType",
+    "Exterior1st",
+    "MasVnrType",
+    "Heating",
+    "GarageType",
+    "MiscFeature",
+    "SaleType",
+    "SaleCondition",
+]
 
 
 def build_pipeline(kind: str) -> Pipeline:
@@ -535,4 +750,72 @@ def build_pipeline(kind: str) -> Pipeline:
                     ("to_category", ToCategory(ordinal_columns + ohe_columns)),
                 ]
             )
+        case "final_tree":
+            return Pipeline(
+                [
+                    ("processor", FinalTreeTransformer()),
+                    ("memory_optimizer", MemoryOptimizer()),
+                    (
+                        "column_transformer",
+                        ColumnTransformer(
+                            transformers=[
+                                ("num_features", "passthrough", new_num_columns),
+                                (
+                                    "cat_features_oe",
+                                    OrdinalEncoder(
+                                        categories=new_ordinal_categories,
+                                        handle_unknown="use_encoded_value",
+                                        unknown_value=-1,
+                                    ),
+                                    new_ordinal_columns,
+                                ),
+                                (
+                                    "cat_features_ohe",
+                                    "passthrough",
+                                    new_ohe_columns,
+                                ),
+                            ],
+                            verbose_feature_names_out=False,
+                        ).set_output(transform="pandas"),
+                    ),
+                    ("to_category", ToCategory(new_ohe_columns)),
+                ]
+            )
+        case "final_tree_for_lin":
+            return Pipeline(
+                [
+                    ("processor", FinalTreeTransformer()),
+                    ("memory_optimizer", MemoryOptimizer()),
+                    (
+                        "column_transformer",
+                        ColumnTransformer(
+                            transformers=[
+                                ("num_features", "passthrough", new_num_columns),
+                                (
+                                    "cat_features_oe",
+                                    OrdinalEncoder(
+                                        categories=new_ordinal_categories,
+                                        handle_unknown="use_encoded_value",
+                                        unknown_value=-1,
+                                    ),
+                                    new_ordinal_columns,
+                                ),
+                                (
+                                    "cat_features_ohe",
+                                    OneHotEncoder(
+                                        drop="first",
+                                        handle_unknown="ignore",
+                                        sparse_output=False,
+                                    ),
+                                    new_ohe_columns,
+                                ),
+                            ],
+                            verbose_feature_names_out=False,
+                        ).set_output(transform="pandas"),
+                    ),
+                    ("scaler", StandardScaler().set_output(transform="pandas")),
+                ]
+            )
+        case "final_lin":
+            return "Пока не готово"
     raise ValueError(f"Unknown pipeline kind: {kind}")

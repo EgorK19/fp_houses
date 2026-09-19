@@ -6,7 +6,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
-from src.processing import BaselineTransformer, MemoryOptimizer, ToCategory
+from src.processing import MemoryOptimizer, ToCategory
 
 
 class AdvancedTransformer(BaseEstimator, TransformerMixin):
@@ -215,7 +215,7 @@ ohe_columns = [
 
 advanced = Pipeline(
     [
-        ("baseline_transformer", BaselineTransformer()),  ### advanced
+        ("baseline_transformer", AdvancedTransformer()),  ### advanced
         ("memory_optimizer", MemoryOptimizer()),
         (
             "column_transformer",

@@ -33,7 +33,7 @@ def set_seed(seed: int = 42) -> None:
         pass
 
 
-def load_data(cfg, use_raw=True):
+def load_data(cfg, use_raw=cfg.general.use_raw):
     if use_raw:
         df_train = pd.read_csv(Path(cfg.paths.train))
         df_test = pd.read_csv(Path(cfg.paths.test))
@@ -112,6 +112,22 @@ def build_experiment_record(
         "metrics": metrics_df.to_dict(orient="records")[0],
         "val_scores_raw": val_scores,  # для paired-тестов задним числом
     }
+
+
+def log_fe_experiment(metrics: dict, note: str = ""):
+    log_dir = Path(cfg.paths.logs)
+    log_file_path = log_dir / "fe_experiments.log"
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    record = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "metrics": metrics,
+        "note": note,
+    }
+
+    with open(log_file_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
 
 
 def log_experiment(record: dict, log_dir: Path):
