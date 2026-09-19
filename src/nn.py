@@ -60,8 +60,8 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         hidden_size=128,
         lr=3e-3,
         epochs=500,
-        patience=30,
-        scheduler_patience=10,
+        patience=50,
+        scheduler_patience=15,
         batch_size=32,
         device="cpu",
         seed=cfg.general.seed,
@@ -81,6 +81,7 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         return nn.Sequential(
             nn.Linear(n_features, self.hidden_size),
             nn.ReLU(),
+            nn.Dropout(0.1),
             nn.Linear(self.hidden_size, 1),
         )
 
@@ -96,7 +97,7 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode="min",
-            factor=0.2,
+            factor=0.5,
             patience=self.scheduler_patience,
         )
 
