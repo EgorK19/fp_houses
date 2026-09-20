@@ -15,13 +15,12 @@
 | nn | 0.11175 | rskf(10×5) | 0.13302 |
 | elasticnet | 0.11206 | rskf(10×5) | 0.13540 |
 
-Лучшие на паблик-лидерборде - `lgbm` и `catboost` (тюненные через Optuna, см. `4.0_final_tree.ipynb` и `notebooks/optuna_results/optuna_studies.db`), почти вровень друг с другом.
+Лучшие на лидерборде - `lgbm` и `catboost` (тюненные через Optuna, см. `4.0_final_tree.ipynb` и `notebooks/optuna_results/optuna_studies.db`), почти вровень друг с другом.
 
 
-Важный методологический момент: ранжирование по внутренней CV (`nn` > `elasticnet` > `lgbm` > `baseline`) почти полностью переворачивается на реальном тесте (`lgbm`/`catboost` - лучшие, `nn`/`elasticnet` - худшие). Это не опечатка - вероятная причина в том, что `nn` и `elasticnet` сильнее переобучаются на структуру train-фолдов, которая не полностью повторяется в test. Поэтому:
-- `OOF_rmsle` у `catboost` - это **не** CV-метрика (у него `run_cv: False` в конфиге, слишком долгая полная CV), а скор на одном 90/10 holdout-сплите ранней остановки - сравнивать её напрямую с rskf-метриками остальных моделей некорректно, отсюда пометка протокола.
+Ранжирование по внутренней CV (`nn` > `elasticnet` > `lgbm` > `baseline`) почти полностью переворачивается на лидерборде (`lgbm`/`catboost` - лучшие, `nn`/`elasticnet` - худшие). Видимо, `nn` и `elasticnet` сильнее переобучаются на структуру train-фолдов, которая не полностью повторяется в test. Поэтому:
+- `OOF_rmsle` у `catboost` - это **не** CV-метрика (у него `run_cv: False` в конфиге, слишком долгая полная CV), а скор на одном 90/10 holdout-сплите ранней остановки - сравнивать её напрямую с rskf-метриками остальных моделей некорректно
 - Полная сравнительная таблица - `outputs/comparison_table.csv` (только модели с честной `10×5` CV) и `outputs/comparison_table_extended.csv` (+ catboost, с колонкой `protocol`).
-- OOF-предсказания моделей с честной CV сохраняются в `outputs/oof_predictions.csv` - заготовка под блендинг/стэкинг поверх уже обученных моделей.
 
 ## Структура проекта
 
@@ -59,7 +58,6 @@ fp_houses/
 
 ## Установка и запуск
 
-
 Требования: Python 3.14, [uv](https://docs.astral.sh/uv/).
 
 1. Клонировать репозиторий и перейти в его директорию.
@@ -72,9 +70,9 @@ fp_houses/
 
    ```
 
-3. Скачать данные соревнования со [страницы Kaggle](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques/data) и положить `train.csv`, `test.csv`, `data_description.txt`, `sample_submission.csv` в `data/raw/` - они не хранятся в репозитории (см. `.gitignore`).
+3. Скачать данные соревнования со [страницы Kaggle](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques/data), положить `train.csv`, `test.csv`, `data_description.txt`, `sample_submission.csv` в `data/raw/` и настроить пути - в репозитории данных нет
 
-4. Запустить пайплайн:
+4. Запуск:
 
    ```bash
 
@@ -85,13 +83,11 @@ fp_houses/
 
 Поведение целиком задаётся в `src/config.py`:
 - `cfg.mode` - `train_and_predict` / `train_only` / `predict_only`;
-- `cfg.models` - список моделей, у каждой свои гиперпараметры, `run_cv` (гонять ли леардборд-CV - для медленных моделей вроде catboost можно выключить) и `final_strategy` (`full_refit` / `cv_ensemble` / `early_stopping_holdout`);
+- `cfg.models` - список моделей, у каждой свои гиперпараметры, `run_cv`  и `final_strategy` (`full_refit` / `cv_ensemble` / `early_stopping_holdout`);
 - `cfg.cv`, `cfg.final` - параметры кросс-валидации и выбора/сохранения финальных моделей.
 
-Отдельного CLI/YAML-конфига нет - правки вносятся прямо в `config.py`.
+Отдельного CLI/YAML-конфига нет - все в `config.py`.
 
 ### Ограничения
 
 - Пути в `config.py` захардкожены под Windows (`d:/vs_projects/fp_houses/...`) - при другом расположении репозитория их нужно поправить руками.
-
-- Блендинг/стэкинг нескольких моделей в `main.py` пока не реализован - `oof_predictions.csv` подготовлен как заготовка под него (подробнее см. историю решений).
