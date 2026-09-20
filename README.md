@@ -65,9 +65,7 @@ fp_houses/
 2. Установить зависимости:
 
    ```bash
-
    uv sync
-
    ```
 
 3. Скачать данные соревнования со [страницы Kaggle](https://www.kaggle.com/competitions/house-prices-advanced-regression-techniques/data), положить `train.csv`, `test.csv`, `data_description.txt`, `sample_submission.csv` в `data/raw/` и настроить пути - в репозитории данных нет
@@ -75,9 +73,7 @@ fp_houses/
 4. Запуск:
 
    ```bash
-
    uv run main.py
-
    ```
 
 
