@@ -817,5 +817,38 @@ def build_pipeline(kind: str) -> Pipeline:
                 ]
             )
         case "final_lin":
-            return "Пока не готово"
+            return Pipeline(
+                [
+                    ("processor", FinalTreeTransformer()),
+                    ("memory_optimizer", MemoryOptimizer()),
+                    (
+                        "column_transformer",
+                        ColumnTransformer(
+                            transformers=[
+                                ("num_features", "passthrough", new_num_columns),
+                                (
+                                    "cat_features_oe",
+                                    OrdinalEncoder(
+                                        categories=new_ordinal_categories,
+                                        handle_unknown="use_encoded_value",
+                                        unknown_value=-1,
+                                    ),
+                                    new_ordinal_columns,
+                                ),
+                                (
+                                    "cat_features_ohe",
+                                    OneHotEncoder(
+                                        drop="first",
+                                        handle_unknown="ignore",
+                                        sparse_output=False,
+                                    ),
+                                    new_ohe_columns,
+                                ),
+                            ],
+                            verbose_feature_names_out=False,
+                        ).set_output(transform="pandas"),
+                    ),
+                    ("scaler", StandardScaler().set_output(transform="pandas")),
+                ]
+            )
     raise ValueError(f"Unknown pipeline kind: {kind}")

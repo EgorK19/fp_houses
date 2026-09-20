@@ -5,6 +5,8 @@ from sklearn.linear_model import ElasticNet, LinearRegression, Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 
+from src.nn import MLPRegressor
+
 REGISTRY = {
     "LinearRegression": LinearRegression,
     "Ridge": Ridge,
@@ -14,6 +16,7 @@ REGISTRY = {
     "SVR": SVR,
     "CatBoostRegressor": CatBoostRegressor,
     "ElasticNet": ElasticNet,
+    "MLPRegressor": MLPRegressor,
 }
 
 

@@ -1,59 +1,14 @@
 import numpy as np
 import torch
 from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm.auto import tqdm
 
 from src.config import cfg
-from src.processing import (
-    FinalTreeTransformer,
-    MemoryOptimizer,
-    new_num_columns,
-    new_ohe_columns,
-    new_ordinal_categories,
-    new_ordinal_columns,
-)
-
-final_lin = Pipeline(
-    [
-        ("processor", FinalTreeTransformer()),
-        ("memory_optimizer", MemoryOptimizer()),
-        (
-            "column_transformer",
-            ColumnTransformer(
-                transformers=[
-                    ("num_features", "passthrough", new_num_columns),
-                    (
-                        "cat_features_oe",
-                        OrdinalEncoder(
-                            categories=new_ordinal_categories,
-                            handle_unknown="use_encoded_value",
-                            unknown_value=-1,
-                        ),
-                        new_ordinal_columns,
-                    ),
-                    (
-                        "cat_features_ohe",
-                        OneHotEncoder(
-                            drop="first",
-                            handle_unknown="ignore",
-                            sparse_output=False,
-                        ),
-                        new_ohe_columns,
-                    ),
-                ],
-                verbose_feature_names_out=False,
-            ).set_output(transform="pandas"),
-        ),
-        ("scaler", StandardScaler().set_output(transform="pandas")),
-    ]
-)
 
 
+# эмбеддинги не помогли, оптимальная конфигурация
 class MLPRegressor(BaseEstimator, RegressorMixin):
     def __init__(
         self,
@@ -65,7 +20,6 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         batch_size=32,
         device="cpu",
         seed=cfg.general.seed,
-        eval_set=None,
     ):
         self.hidden_size = hidden_size
         self.lr = lr
@@ -75,7 +29,6 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         self.batch_size = batch_size
         self.device = device
         self.seed = seed
-        self.eval_set = eval_set
 
     def _build_model(self, n_features):
         return nn.Sequential(
@@ -88,7 +41,7 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
             nn.Linear(self.hidden_size // 4, 1),
         )
 
-    def fit(self, X, y):
+    def fit(self, X, y, eval_X=None, eval_y=None):
         torch.manual_seed(self.seed)
 
         X_arr = np.asarray(X, dtype=np.float32)
@@ -107,17 +60,17 @@ class MLPRegressor(BaseEstimator, RegressorMixin):
         loss_fn = nn.MSELoss()
 
         dataset = TensorDataset(torch.from_numpy(X_arr), torch.from_numpy(y_arr))
-        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        loader = DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=True, drop_last=True
+        )
 
-        has_eval = self.eval_set is not None
+        has_eval = eval_X is not None
         if has_eval:
-            X_val, y_val = self.eval_set
-
             X_val_t = torch.as_tensor(
-                np.asarray(X_val), dtype=torch.float32, device=self.device
+                np.asarray(eval_X), dtype=torch.float32, device=self.device
             )
             y_val_t = torch.as_tensor(
-                np.asarray(y_val), dtype=torch.float32, device=self.device
+                np.asarray(eval_y), dtype=torch.float32, device=self.device
             ).view(-1, 1)
 
             best_val_loss = float("inf")
